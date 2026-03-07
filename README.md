@@ -70,17 +70,44 @@ chmod +x scripts/*.sh
 
 ### Despues de instalar
 
-Rellena estos archivos con la informacion de tu proyecto:
+No todos los archivos se llenan igual. Hay tres tipos:
+
+**Tu los llenas** — Conocimiento del producto que solo tu tienes:
 
 | Archivo | Que poner |
 |---------|-----------|
 | `CLAUDE.md` | Identidad del producto, reglas criticas, estado actual |
 | `.cursorrules` | Lo mismo que CLAUDE.md (para Cursor/Windsurf) |
-| `WORKING_STATE.md` | Que esta en progreso, que sigue |
 | `.product/context/PRODUCT.md` | Que hace el producto y para quien |
+| `.product/context/BUSINESS.md` | Modelo de negocio, cliente, monetizacion |
+| `.product/context/ROADMAP.md` | Objetivos a 30/60/90 dias |
 | `.product/architecture/OVERVIEW.md` | Stack, diagrama, patrones |
+| `.product/architecture/COMPONENTS.md` | Detalle de cada componente |
+| `.product/architecture/RISKS.md` | Riesgos tecnicos y deuda conocida |
+| `.product/security/SECURITY.md` | Politicas de seguridad, datos sensibles |
+| `.product/security/THREAT_MODEL.md` | Superficie de ataque, amenazas |
+| `.product/operations/RUNBOOK.md` | Procedimientos de deploy y rollback |
+| `.product/operations/RELEASE_CHECKLIST.md` | Checklist pre-release |
+| `.product/contracts/AGENT_CONTRACT.md` | Nivel de autonomia del agente |
 
-Los demas archivos en `.product/` los llenas tu conforme el proyecto avanza — el agente puede proponerte drafts, pero tu revisas y haces commit. Estos archivos contienen conocimiento del producto (modelo de negocio, riesgos, amenazas, procedimientos de deploy) que solo tu tienes.
+El agente puede proponerte drafts de estos archivos conforme trabajan juntos, pero tu revisas y haces commit.
+
+**El agente los actualiza** (con tu aprobacion) — Memoria y estado del proyecto:
+
+| Archivo | Cuando se actualiza |
+|---------|---------------------|
+| `WORKING_STATE.md` | Al cierre de cada sesion — el agente propone el nuevo estado |
+| `.product/memory/YYYY-MM-DD.md` | Durante la sesion — logs diarios, append-only |
+| `.product/memory/MEMORY.md` | Cuando hay hechos duraderos nuevos (lecciones, preferencias) |
+| `.product/context/DECISIONS.md` | Cuando se toma una decision arquitectonica (ADRs) |
+| `AGENT_CONTEXT.md` | Cuando cambia el mapa de contexto del producto |
+| `CHANGELOG.md` | Al preparar un release |
+
+**Automatico** — Sin intervencion humana:
+
+| Archivo | Como funciona |
+|---------|---------------|
+| `CLAUDE.md` (seccion Estado Actual) | El git hook `pre-commit` sincroniza `WORKING_STATE.md` dentro de `CLAUDE.md` en cada commit |
 
 ## Como funciona
 
