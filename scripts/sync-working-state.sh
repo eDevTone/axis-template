@@ -115,12 +115,15 @@ sync_target() {
             ;;
 
         "sync")
-            local tmp_file
+            local tmp_file state_file
             tmp_file=$(mktemp)
+            state_file=$(mktemp)
+            echo -e "$NEW_STATE" > "$state_file"
 
-            awk -v new_state="$(echo -e "$NEW_STATE")" '
+            STATE_FILE="$state_file" awk '
             /^## Estado Actual/ {
-                print new_state
+                while ((getline line < ENVIRON["STATE_FILE"]) > 0) print line
+                close(ENVIRON["STATE_FILE"])
                 skip = 1
                 next
             }
@@ -131,6 +134,8 @@ sync_target() {
                 print
             }
             ' "$target_file" > "$tmp_file"
+
+            rm -f "$state_file"
 
             if diff -q "$target_file" "$tmp_file" > /dev/null 2>&1; then
                 echo "$target_file ya esta sincronizado — sin cambios"
