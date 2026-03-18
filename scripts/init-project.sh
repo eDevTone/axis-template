@@ -10,14 +10,7 @@
 # Uso (desde la raíz de tu proyecto con AXIS instalado):
 #   bash scripts/init-project.sh
 
-set -euo pipefail
-
-# ─── Log de errores ───────────────────────────────────────────────────────────
-LOG_FILE="/tmp/axis-init-$(date '+%Y%m%d-%H%M%S').log"
-exec > >(tee -a "$LOG_FILE") 2>&1
-
-# Trap para mostrar el error y el log cuando falla
-trap 'echo ""; echo -e "\033[0;31m✗ Error en línea $LINENO. Log completo en: $LOG_FILE\033[0m"; echo ""; echo "--- Últimas líneas del log ---"; tail -20 "$LOG_FILE"' ERR
+set -uo pipefail
 
 SKILLS_DIR=".claude/skills"
 
@@ -396,78 +389,56 @@ main() {
     autodetect_stack
     extract_context_keywords
 
-    TECH_OPTIONS=(
-        "Next.js"
-        "React"
-        "React Native"
-        "Node.js / NestJS"
-        "TypeScript"
-        "PostgreSQL"
-        "Stripe"
-        "Auth (Clerk/NextAuth)"
-        "AWS"
-        "Vercel"
-        "Docker / DevOps"
-        "Testing"
-        "Design System / UI"
-        "Web3 / Blockchain"
-    )
-
+    # Arrays globales para evitar problemas con set -u
+    TECH_OPTIONS=("Next.js" "React" "React Native" "Node.js / NestJS" "TypeScript" "PostgreSQL" "Stripe" "Auth (Clerk/NextAuth)" "AWS" "Vercel" "Docker / DevOps" "Testing" "Design System / UI" "Web3 / Blockchain")
     TECH_KEYS=("nextjs" "react" "react-native" "nestjs" "typescript" "postgres" "stripe" "auth" "aws" "vercel" "docker" "testing" "design" "web3")
+    TECH_QUERIES=("react nextjs" "react" "react native" "node typescript api" "typescript" "postgres database" "stripe billing" "auth authentication" "aws deploy" "vercel deploy" "docker devops ci-cd" "testing" "design ui" "web3 blockchain")
 
-    TECH_QUERIES=(
-        "react nextjs"
-        "react"
-        "react native"
-        "node typescript api"
-        "typescript"
-        "postgres database"
-        "stripe billing"
-        "auth authentication"
-        "aws deploy"
-        "vercel deploy"
-        "docker devops ci-cd"
-        "testing"
-        "design ui"
-        "web3 blockchain"
-    )
+    SELECTED_INDICES=()
+    STACK_STR=""
 
-    if [ "${#AUTO_DETECTED_LABELS[@]}" -gt 0 ]; then
+    AUTO_COUNT=${#AUTO_DETECTED_LABELS[@]}
+
+    if [ "$AUTO_COUNT" -gt 0 ]; then
         echo ""
-        echo -e "  ${GREEN}Auto-detectado desde package.json:${NC} ${AUTO_DETECTED_LABELS[*]}"
+        echo -e "  ${GREEN}Auto-detectado desde package.json:${NC} ${AUTO_DETECTED_LABELS[*]:-}"
         ask "¿Usar stack auto-detectado? (s/n)" "s" USE_AUTO
         if [[ "$USE_AUTO" =~ ^[sS]$ ]]; then
-            SELECTED_INDICES=()
-            for auto_key in "${AUTO_DETECTED_STACK[@]}"; do
+            for auto_key in "${AUTO_DETECTED_STACK[@]:-}"; do
                 for i in "${!TECH_KEYS[@]}"; do
-                    [ "${TECH_KEYS[$i]}" = "$auto_key" ] && SELECTED_INDICES+=("$i")
+                    if [ "${TECH_KEYS[$i]}" = "$auto_key" ]; then
+                        SELECTED_INDICES+=("$i")
+                        break
+                    fi
                 done
             done
-            STACK_DISPLAY="${AUTO_DETECTED_LABELS[*]}"
-            STACK_STR="$STACK_DISPLAY"
+            STACK_STR="${AUTO_DETECTED_LABELS[*]:-}"
         else
             ask_multiselect "¿Qué tecnologías usas?" "${TECH_OPTIONS[@]}"
-            SELECTED_INDICES=()
-            STACK_DISPLAY=""
-            for num in $MULTISELECT_RESULT; do
+            STACK_STR=""
+            for num in ${MULTISELECT_RESULT:-}; do
                 idx=$((num - 1))
-                [ "$idx" -ge 0 ] && [ "$idx" -lt "${#TECH_OPTIONS[@]}" ] && \
-                    SELECTED_INDICES+=("$idx") && STACK_DISPLAY="$STACK_DISPLAY ${TECH_OPTIONS[$idx]},"
+                if [ "$idx" -ge 0 ] && [ "$idx" -lt 14 ]; then
+                    SELECTED_INDICES+=("$idx")
+                    STACK_STR="$STACK_STR ${TECH_OPTIONS[$idx]},"
+                fi
             done
-            STACK_STR="${STACK_DISPLAY%,}"
+            STACK_STR="${STACK_STR%,}"
         fi
     else
         ask_multiselect "¿Qué tecnologías usas?" "${TECH_OPTIONS[@]}"
-        SELECTED_INDICES=()
-        STACK_DISPLAY=""
-        for num in $MULTISELECT_RESULT; do
+        STACK_STR=""
+        for num in ${MULTISELECT_RESULT:-}; do
             idx=$((num - 1))
-            [ "$idx" -ge 0 ] && [ "$idx" -lt "${#TECH_OPTIONS[@]}" ] && \
-                SELECTED_INDICES+=("$idx") && STACK_DISPLAY="$STACK_DISPLAY ${TECH_OPTIONS[$idx]},"
+            if [ "$idx" -ge 0 ] && [ "$idx" -lt 14 ]; then
+                SELECTED_INDICES+=("$idx")
+                STACK_STR="$STACK_STR ${TECH_OPTIONS[$idx]},"
+            fi
         done
-        STACK_STR="${STACK_DISPLAY%,}"
+        STACK_STR="${STACK_STR%,}"
     fi
 
+    [ -z "$STACK_STR" ] && STACK_STR="(no especificado)"
     echo ""
     echo -e "Stack: ${GREEN}${STACK_STR}${NC}"
 
@@ -476,8 +447,10 @@ main() {
 
     declare -a ALL_FOUND_SKILLS=()
 
-    if [ "$SKILLS_CLI_AVAILABLE" = true ] && [ "${#SELECTED_INDICES[@]}" -gt 0 ]; then
-        declare -a SKILL_SEARCH_RESULTS=()
+    SELECTED_COUNT=${#SELECTED_INDICES[@]}
+
+    if [ "$SKILLS_CLI_AVAILABLE" = true ] && [ "$SELECTED_COUNT" -gt 0 ]; then
+        SKILL_SEARCH_RESULTS=()
 
         # Búsqueda por stack
         for idx in "${SELECTED_INDICES[@]}"; do
@@ -516,26 +489,23 @@ main() {
         fi
 
         ALL_FOUND_SKILLS=("${SKILL_SEARCH_RESULTS[@]:-}")
+        ALL_FOUND_COUNT=${#ALL_FOUND_SKILLS[@]}
 
-        if [ "${#ALL_FOUND_SKILLS[@]}" -gt 0 ]; then
+        if [ "$ALL_FOUND_COUNT" -gt 0 ]; then
             echo ""
             ask "¿Instalar todos los skills encontrados? (s/n)" "s" INSTALL_ALL
 
             if [[ "$INSTALL_ALL" =~ ^[sS]$ ]]; then
-                SKILLS_TO_INSTALL=("${ALL_FOUND_SKILLS[@]}")
+                SKILLS_TO_INSTALL=("${ALL_FOUND_SKILLS[@]:-}")
             else
-                # Mostrar numerados para selección
                 echo ""
-                declare -a UNIQUE_SKILLS=()
-                declare -A seen_skills
-                for s in "${ALL_FOUND_SKILLS[@]}"; do
-                    [ -z "${seen_skills[$s]:-}" ] && UNIQUE_SKILLS+=("$s") && seen_skills[$s]=1
-                done
-                ask_multiselect "¿Cuáles instalar?" "${UNIQUE_SKILLS[@]}"
+                UNIQUE_SKILLS=("${ALL_FOUND_SKILLS[@]:-}")
+                ask_multiselect "¿Cuáles instalar?" "${UNIQUE_SKILLS[@]:-}"
                 SKILLS_TO_INSTALL=()
-                for num in $MULTISELECT_RESULT; do
+                for num in ${MULTISELECT_RESULT:-}; do
                     idx=$((num - 1))
-                    [ "$idx" -ge 0 ] && [ "$idx" -lt "${#UNIQUE_SKILLS[@]}" ] && \
+                    UNIQUE_COUNT=${#UNIQUE_SKILLS[@]}
+                    [ "$idx" -ge 0 ] && [ "$idx" -lt "$UNIQUE_COUNT" ] && \
                         SKILLS_TO_INSTALL+=("${UNIQUE_SKILLS[$idx]}")
                 done
             fi
