@@ -125,11 +125,21 @@ extract_context_keywords() {
 
 # ─── Skills desde skills.sh ───────────────────────────────────────────────────
 search_skills() {
+    # Devuelve líneas con formato: "owner/repo@skill|||123.4K installs"
     local query="$1"
-    npx --yes skills find "$query" 2>/dev/null \
-        | grep -E '@' | grep -v '└' \
-        | sed 's/\x1b\[[0-9;]*m//g' \
-        | awk '{print $1}' | head -5 || true
+    local raw
+    raw=$(npx --yes skills find "$query" 2>/dev/null | sed 's/\x1b\[[0-9;]*m//g' || true)
+
+    # Parsear: líneas con @ son el skill, la siguiente con └ tiene el URL (ignorar)
+    # El número de installs está en la misma línea que el skill ref
+    echo "$raw" | grep -E '@' | grep -v '└' | while IFS= read -r line; do
+        local ref installs
+        ref=$(echo "$line" | awk '{print $1}')
+        installs=$(echo "$line" | grep -oE '[0-9]+(\.[0-9]+)?[KMB]? installs' | head -1)
+        [ -z "$ref" ] && continue
+        [ -z "$installs" ] && installs="? installs"
+        echo "${ref}|||${installs}"
+    done | head -5 || true
 }
 
 install_skill() {
@@ -491,19 +501,29 @@ main() {
 
         # Recolectar hasta 3 skills por query (deduplicados, compatible bash 3)
         ALL_SKILL_REFS=()
-        SEEN_SKILLS_STR=" "  # string con refs separadas por espacio para dedup
+        ALL_SKILL_INSTALLS=()
+        ALL_SKILL_SECTIONS=()   # a qué stack pertenece cada skill
+        SEEN_SKILLS_STR=" "
 
+        # Índice de queries mapeado a label de stack
+        QUERY_IDX=0
         for query in "${SELECTED_QUERIES[@]:-}"; do
+            STACK_LABEL="${TECH_OPTIONS[$QUERY_IDX]:-$query}"
+            QUERY_IDX=$((QUERY_IDX + 1))
             COUNT_FOR_QUERY=0
-            while IFS= read -r skill_ref; do
-                [ -z "$skill_ref" ] && continue
+            while IFS= read -r line; do
+                [ -z "$line" ] && continue
                 [ "$COUNT_FOR_QUERY" -ge 3 ] && break
-                # Deduplicar sin arrays asociativos (bash 3 compatible)
+                skill_ref=$(echo "$line" | cut -d'|' -f1)
+                installs=$(echo "$line" | cut -d'|' -f4)
+                [ -z "$skill_ref" ] && continue
                 case "$SEEN_SKILLS_STR" in
-                    *" $skill_ref "*) continue ;;  # ya existe
+                    *" $skill_ref "*) continue ;;
                 esac
                 SEEN_SKILLS_STR="$SEEN_SKILLS_STR$skill_ref "
                 ALL_SKILL_REFS+=("$skill_ref")
+                ALL_SKILL_INSTALLS+=("$installs")
+                ALL_SKILL_SECTIONS+=("$STACK_LABEL")
                 COUNT_FOR_QUERY=$((COUNT_FOR_QUERY + 1))
             done < <(search_skills "$query")
         done
@@ -513,13 +533,26 @@ main() {
         if [ "$TOTAL_SKILLS" -gt 0 ]; then
             echo ""
             echo -e "${BOLD}Skills encontrados (máx 3 por tecnología):${NC}"
-            echo ""
+
+            CURRENT_SECTION=""
             for i in "${!ALL_SKILL_REFS[@]}"; do
                 skill_ref="${ALL_SKILL_REFS[$i]}"
+                installs="${ALL_SKILL_INSTALLS[$i]:-}"
+                section="${ALL_SKILL_SECTIONS[$i]:-}"
                 skill_name=$(echo "$skill_ref" | sed 's/.*@//')
+
+                # Imprimir encabezado de sección cuando cambia el stack
+                if [ "$section" != "$CURRENT_SECTION" ]; then
+                    echo ""
+                    echo -e "  ${BOLD}── $section ──${NC}"
+                    CURRENT_SECTION="$section"
+                fi
+
                 existing=""
-                [ -d "$SKILLS_DIR/$skill_name" ] && existing="${YELLOW} ✓ ya instalado${NC}"
-                echo -e "  ${CYAN}$((i+1))${NC}) $skill_ref$existing"
+                [ -d "$SKILLS_DIR/$skill_name" ] && existing=" ${YELLOW}✓ ya instalado${NC}"
+                installs_display=""
+                [ -n "$installs" ] && installs_display=" ${BLUE}($installs)${NC}"
+                echo -e "  ${CYAN}$((i+1))${NC}) $skill_ref$installs_display$existing"
             done
 
             echo ""
