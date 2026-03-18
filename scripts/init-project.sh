@@ -143,8 +143,8 @@ install_skill() {
         return 0
     fi
 
-    echo -e "  Instalando ${CYAN}$skill_ref${NC}..."
-    npx --yes skills add "$skill_ref" 2>/dev/null && print_success "Instalado: $skill_name" || print_warning "No se pudo instalar: $skill_ref"
+    echo -e "  Instalando ${CYAN}$skill_ref${NC} en $SKILLS_DIR/..."
+    npx --yes skills add "$skill_ref" --dir "$SKILLS_DIR" 2>/dev/null && print_success "Instalado: $skill_name" || print_warning "No se pudo instalar: $skill_ref"
 }
 
 # ─── Reemplazar placeholders ──────────────────────────────────────────────────
@@ -389,38 +389,76 @@ main() {
     autodetect_stack
     extract_context_keywords
 
-    # Arrays globales para evitar problemas con set -u
-    TECH_OPTIONS=("Next.js" "React" "React Native" "Node.js / NestJS" "TypeScript" "PostgreSQL" "Stripe" "Auth (Clerk/NextAuth)" "AWS" "Vercel" "Docker / DevOps" "Testing" "Design System / UI" "Web3 / Blockchain")
-    TECH_KEYS=("nextjs" "react" "react-native" "nestjs" "typescript" "postgres" "stripe" "auth" "aws" "vercel" "docker" "testing" "design" "web3")
-    TECH_QUERIES=("react nextjs" "react" "react native" "node typescript api" "typescript" "postgres database" "stripe billing" "auth authentication" "aws deploy" "vercel deploy" "docker devops ci-cd" "testing" "design ui" "web3 blockchain")
+    # ── Tipo de proyecto ──────────────────────────────────────────────────
+    echo ""
+    echo -e "${BOLD}¿Qué tipo de proyecto es?${NC}"
+    echo "  1) Frontend"
+    echo "  2) Backend"
+    echo "  3) FullStack"
+    ask "Tipo" "3" PROJECT_TYPE_NUM
 
-    SELECTED_INDICES=()
+    case "$PROJECT_TYPE_NUM" in
+        1) PROJECT_TYPE="Frontend" ;;
+        2) PROJECT_TYPE="Backend" ;;
+        *) PROJECT_TYPE="FullStack" ;;
+    esac
+
+    echo ""
+    echo -e "  Tipo: ${GREEN}$PROJECT_TYPE${NC}"
+    echo ""
+
+    # Opciones según tipo de proyecto
+    case "$PROJECT_TYPE_NUM" in
+        1) # Frontend
+            TECH_OPTIONS=("React" "Next.js" "React Native" "TypeScript" "Tailwind / Design System" "Testing (Vitest/Playwright)" "Auth (Clerk/NextAuth)" "Stripe (frontend)")
+            TECH_QUERIES=("react" "react nextjs" "react native" "typescript" "design ui" "testing" "auth authentication" "stripe billing")
+            ;;
+        2) # Backend
+            TECH_OPTIONS=("Node.js" "NestJS" "TypeScript" "PostgreSQL" "Stripe (backend)" "Auth / JWT" "Docker / DevOps" "Testing (Jest)")
+            TECH_QUERIES=("node api" "node typescript api" "typescript" "postgres database" "stripe billing" "auth authentication" "docker devops ci-cd" "testing")
+            ;;
+        *) # FullStack
+            TECH_OPTIONS=("Next.js / React" "React Native" "Node.js / NestJS" "TypeScript" "PostgreSQL" "Stripe" "Auth (Clerk/NextAuth)" "Docker / DevOps" "Testing" "Design System / UI")
+            TECH_QUERIES=("react nextjs" "react native" "node typescript api" "typescript" "postgres database" "stripe billing" "auth authentication" "docker devops ci-cd" "testing" "design ui")
+            ;;
+    esac
+
     STACK_STR=""
+    SELECTED_QUERIES=()
 
     AUTO_COUNT=${#AUTO_DETECTED_LABELS[@]}
 
     if [ "$AUTO_COUNT" -gt 0 ]; then
-        echo ""
         echo -e "  ${GREEN}Auto-detectado desde package.json:${NC} ${AUTO_DETECTED_LABELS[*]:-}"
         ask "¿Usar stack auto-detectado? (s/n)" "s" USE_AUTO
         if [[ "$USE_AUTO" =~ ^[sS]$ ]]; then
-            for auto_key in "${AUTO_DETECTED_STACK[@]:-}"; do
-                for i in "${!TECH_KEYS[@]}"; do
-                    if [ "${TECH_KEYS[$i]}" = "$auto_key" ]; then
-                        SELECTED_INDICES+=("$i")
-                        break
-                    fi
-                done
-            done
             STACK_STR="${AUTO_DETECTED_LABELS[*]:-}"
+            # Mapear labels detectados a queries
+            for auto_key in "${AUTO_DETECTED_STACK[@]:-}"; do
+                case "$auto_key" in
+                    nextjs)    SELECTED_QUERIES+=("react nextjs") ;;
+                    react)     SELECTED_QUERIES+=("react") ;;
+                    react-native) SELECTED_QUERIES+=("react native") ;;
+                    nestjs)    SELECTED_QUERIES+=("node typescript api") ;;
+                    typescript) SELECTED_QUERIES+=("typescript") ;;
+                    postgres)  SELECTED_QUERIES+=("postgres database") ;;
+                    stripe)    SELECTED_QUERIES+=("stripe billing") ;;
+                    auth)      SELECTED_QUERIES+=("auth authentication") ;;
+                    testing)   SELECTED_QUERIES+=("testing") ;;
+                    design)    SELECTED_QUERIES+=("design ui") ;;
+                    docker)    SELECTED_QUERIES+=("docker devops ci-cd") ;;
+                    web3)      SELECTED_QUERIES+=("web3 blockchain") ;;
+                esac
+            done
         else
             ask_multiselect "¿Qué tecnologías usas?" "${TECH_OPTIONS[@]}"
             STACK_STR=""
+            OPT_COUNT=${#TECH_OPTIONS[@]}
             for num in ${MULTISELECT_RESULT:-}; do
                 idx=$((num - 1))
-                if [ "$idx" -ge 0 ] && [ "$idx" -lt 14 ]; then
-                    SELECTED_INDICES+=("$idx")
+                if [ "$idx" -ge 0 ] && [ "$idx" -lt "$OPT_COUNT" ]; then
                     STACK_STR="$STACK_STR ${TECH_OPTIONS[$idx]},"
+                    SELECTED_QUERIES+=("${TECH_QUERIES[$idx]}")
                 fi
             done
             STACK_STR="${STACK_STR%,}"
@@ -428,11 +466,12 @@ main() {
     else
         ask_multiselect "¿Qué tecnologías usas?" "${TECH_OPTIONS[@]}"
         STACK_STR=""
+        OPT_COUNT=${#TECH_OPTIONS[@]}
         for num in ${MULTISELECT_RESULT:-}; do
             idx=$((num - 1))
-            if [ "$idx" -ge 0 ] && [ "$idx" -lt 14 ]; then
-                SELECTED_INDICES+=("$idx")
+            if [ "$idx" -ge 0 ] && [ "$idx" -lt "$OPT_COUNT" ]; then
                 STACK_STR="$STACK_STR ${TECH_OPTIONS[$idx]},"
+                SELECTED_QUERIES+=("${TECH_QUERIES[$idx]}")
             fi
         done
         STACK_STR="${STACK_STR%,}"
@@ -442,81 +481,76 @@ main() {
     echo ""
     echo -e "Stack: ${GREEN}${STACK_STR}${NC}"
 
-    # ── Paso 4: Skills desde skills.sh ────────────────────────────────────
+    # ── Paso 4: Skills desde skills.sh (3 por stack, instalación por proyecto) ──
     print_step "4/5 — Skills desde skills.sh"
 
-    declare -a ALL_FOUND_SKILLS=()
+    SKILLS_TO_INSTALL=()
+    QUERY_COUNT=${#SELECTED_QUERIES[@]}
 
-    SELECTED_COUNT=${#SELECTED_INDICES[@]}
+    if [ "$SKILLS_CLI_AVAILABLE" = true ] && [ "$QUERY_COUNT" -gt 0 ]; then
 
-    if [ "$SKILLS_CLI_AVAILABLE" = true ] && [ "$SELECTED_COUNT" -gt 0 ]; then
-        SKILL_SEARCH_RESULTS=()
+        # Recolectar hasta 3 skills por query (deduplicados)
+        ALL_SKILL_REFS=()
+        ALL_SKILL_LABELS=()
+        declare -A SEEN_SKILLS
 
-        # Búsqueda por stack
-        for idx in "${SELECTED_INDICES[@]}"; do
-            query="${TECH_QUERIES[$idx]}"
-            label="${TECH_OPTIONS[$idx]}"
-            echo ""
-            echo -e "  ${BOLD}→ Skills para ${CYAN}$label${NC}:"
+        for query in "${SELECTED_QUERIES[@]:-}"; do
+            COUNT_FOR_QUERY=0
             while IFS= read -r skill_ref; do
                 [ -z "$skill_ref" ] && continue
-                skill_name=$(echo "$skill_ref" | sed 's/.*@//')
-                existing=""
-                [ -d "$SKILLS_DIR/$skill_name" ] && existing=" ${YELLOW}(ya instalado)${NC}"
-                echo -e "    • $skill_ref$existing"
-                SKILL_SEARCH_RESULTS+=("$skill_ref")
+                [ "$COUNT_FOR_QUERY" -ge 3 ] && break
+                # Deduplicar
+                if [ -z "${SEEN_SKILLS[$skill_ref]:-}" ]; then
+                    SEEN_SKILLS[$skill_ref]=1
+                    skill_name=$(echo "$skill_ref" | sed 's/.*@//')
+                    ALL_SKILL_REFS+=("$skill_ref")
+                    existing_tag=""
+                    [ -d "$SKILLS_DIR/$skill_name" ] && existing_tag=" (ya instalado)"
+                    ALL_SKILL_LABELS+=("$skill_ref$existing_tag")
+                    COUNT_FOR_QUERY=$((COUNT_FOR_QUERY + 1))
+                fi
             done < <(search_skills "$query")
         done
 
-        # Búsqueda adicional por keywords del README/PRODUCT.md
-        if [ -n "${CONTEXT_KEYWORDS:-}" ]; then
+        TOTAL_SKILLS=${#ALL_SKILL_REFS[@]}
+
+        if [ "$TOTAL_SKILLS" -gt 0 ]; then
             echo ""
-            echo -e "  ${BOLD}→ Skills por keywords del proyecto (${CYAN}$CONTEXT_KEYWORDS${NC}${BOLD}):${NC}"
-            while IFS= read -r skill_ref; do
-                [ -z "$skill_ref" ] && continue
-                # Evitar duplicados
-                already=false
-                for existing_skill in "${SKILL_SEARCH_RESULTS[@]:-}"; do
-                    [ "$existing_skill" = "$skill_ref" ] && already=true && break
-                done
-                $already && continue
+            echo -e "${BOLD}Skills encontrados (máx 3 por tecnología):${NC}"
+            echo ""
+            for i in "${!ALL_SKILL_REFS[@]}"; do
+                skill_ref="${ALL_SKILL_REFS[$i]}"
                 skill_name=$(echo "$skill_ref" | sed 's/.*@//')
                 existing=""
-                [ -d "$SKILLS_DIR/$skill_name" ] && existing=" ${YELLOW}(ya instalado)${NC}"
-                echo -e "    • $skill_ref$existing"
-                SKILL_SEARCH_RESULTS+=("$skill_ref")
-            done < <(search_skills "$CONTEXT_KEYWORDS")
-        fi
-
-        ALL_FOUND_SKILLS=("${SKILL_SEARCH_RESULTS[@]:-}")
-        ALL_FOUND_COUNT=${#ALL_FOUND_SKILLS[@]}
-
-        if [ "$ALL_FOUND_COUNT" -gt 0 ]; then
-            echo ""
-            ask "¿Instalar todos los skills encontrados? (s/n)" "s" INSTALL_ALL
-
-            if [[ "$INSTALL_ALL" =~ ^[sS]$ ]]; then
-                SKILLS_TO_INSTALL=("${ALL_FOUND_SKILLS[@]:-}")
-            else
-                echo ""
-                UNIQUE_SKILLS=("${ALL_FOUND_SKILLS[@]:-}")
-                ask_multiselect "¿Cuáles instalar?" "${UNIQUE_SKILLS[@]:-}"
-                SKILLS_TO_INSTALL=()
-                for num in ${MULTISELECT_RESULT:-}; do
-                    idx=$((num - 1))
-                    UNIQUE_COUNT=${#UNIQUE_SKILLS[@]}
-                    [ "$idx" -ge 0 ] && [ "$idx" -lt "$UNIQUE_COUNT" ] && \
-                        SKILLS_TO_INSTALL+=("${UNIQUE_SKILLS[$idx]}")
-                done
-            fi
-
-            echo ""
-            for skill_ref in "${SKILLS_TO_INSTALL[@]:-}"; do
-                [ -n "$skill_ref" ] && install_skill "$skill_ref"
+                [ -d "$SKILLS_DIR/$skill_name" ] && existing="${YELLOW} ✓ ya instalado${NC}"
+                echo -e "  ${CYAN}$((i+1))${NC}) $skill_ref$existing"
             done
+
+            echo ""
+            echo -e "${BOLD}¿Cuáles instalar? (números separados por espacio, Enter para ninguno)${NC}: "
+            read -r SKILL_SELECTION
+
+            for num in ${SKILL_SELECTION:-}; do
+                idx=$((num - 1))
+                if [ "$idx" -ge 0 ] && [ "$idx" -lt "$TOTAL_SKILLS" ]; then
+                    SKILLS_TO_INSTALL+=("${ALL_SKILL_REFS[$idx]}")
+                fi
+            done
+
+            if [ "${#SKILLS_TO_INSTALL[@]}" -gt 0 ]; then
+                echo ""
+                echo -e "${BOLD}Instalando skills en el proyecto (${CYAN}$SKILLS_DIR/${NC}${BOLD})...${NC}"
+                for skill_ref in "${SKILLS_TO_INSTALL[@]:-}"; do
+                    [ -n "$skill_ref" ] && install_skill "$skill_ref"
+                done
+            else
+                print_warning "Ningún skill seleccionado. Puedes instalar después: npx skills add owner/repo@skill --dir .claude/skills"
+            fi
+        else
+            print_warning "No se encontraron skills. Intenta: npx skills find <query>"
         fi
     else
-        print_warning "Sin Node.js o sin stack seleccionado. Busca skills después: npx skills find <query>"
+        print_warning "Sin Node.js o sin stack seleccionado. Instala skills después: npx skills find <query>"
     fi
 
     # ── Paso 5: Aplicar todo ───────────────────────────────────────────────
