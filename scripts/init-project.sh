@@ -484,31 +484,27 @@ main() {
     # ── Paso 4: Skills desde skills.sh (3 por stack, instalación por proyecto) ──
     print_step "4/5 — Skills desde skills.sh"
 
-    SKILLS_TO_INSTALL=()
+    SKILLS_TO_INSTALL=("")
     QUERY_COUNT=${#SELECTED_QUERIES[@]}
 
     if [ "$SKILLS_CLI_AVAILABLE" = true ] && [ "$QUERY_COUNT" -gt 0 ]; then
 
-        # Recolectar hasta 3 skills por query (deduplicados)
+        # Recolectar hasta 3 skills por query (deduplicados, compatible bash 3)
         ALL_SKILL_REFS=()
-        ALL_SKILL_LABELS=()
-        declare -A SEEN_SKILLS
+        SEEN_SKILLS_STR=" "  # string con refs separadas por espacio para dedup
 
         for query in "${SELECTED_QUERIES[@]:-}"; do
             COUNT_FOR_QUERY=0
             while IFS= read -r skill_ref; do
                 [ -z "$skill_ref" ] && continue
                 [ "$COUNT_FOR_QUERY" -ge 3 ] && break
-                # Deduplicar
-                if [ -z "${SEEN_SKILLS[$skill_ref]:-}" ]; then
-                    SEEN_SKILLS[$skill_ref]=1
-                    skill_name=$(echo "$skill_ref" | sed 's/.*@//')
-                    ALL_SKILL_REFS+=("$skill_ref")
-                    existing_tag=""
-                    [ -d "$SKILLS_DIR/$skill_name" ] && existing_tag=" (ya instalado)"
-                    ALL_SKILL_LABELS+=("$skill_ref$existing_tag")
-                    COUNT_FOR_QUERY=$((COUNT_FOR_QUERY + 1))
-                fi
+                # Deduplicar sin arrays asociativos (bash 3 compatible)
+                case "$SEEN_SKILLS_STR" in
+                    *" $skill_ref "*) continue ;;  # ya existe
+                esac
+                SEEN_SKILLS_STR="$SEEN_SKILLS_STR$skill_ref "
+                ALL_SKILL_REFS+=("$skill_ref")
+                COUNT_FOR_QUERY=$((COUNT_FOR_QUERY + 1))
             done < <(search_skills "$query")
         done
 
