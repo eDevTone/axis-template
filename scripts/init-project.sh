@@ -12,6 +12,13 @@
 
 set -euo pipefail
 
+# ─── Log de errores ───────────────────────────────────────────────────────────
+LOG_FILE="/tmp/axis-init-$(date '+%Y%m%d-%H%M%S').log"
+exec > >(tee -a "$LOG_FILE") 2>&1
+
+# Trap para mostrar el error y el log cuando falla
+trap 'echo ""; echo -e "\033[0;31m✗ Error en línea $LINENO. Log completo en: $LOG_FILE\033[0m"; echo ""; echo "--- Últimas líneas del log ---"; tail -20 "$LOG_FILE"' ERR
+
 SKILLS_DIR=".claude/skills"
 
 # ─── Colores ─────────────────────────────────────────────────────────────────
