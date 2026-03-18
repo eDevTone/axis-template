@@ -7,10 +7,24 @@ dependencies: WORKING_STATE.md, .product/memory/MEMORY.md
 
 ## Que hacer
 
+### Paso 0 — Detectar compactación (PRIMERO)
+Si el mensaje de inicio contiene `<summary>`, un bloque de resumen automático, o el usuario dice "dónde estábamos" / "continúa":
+→ **Activar skill `working-buffer` en MODO 2 (Recovery)** antes de continuar.
+→ No ejecutar los pasos siguientes hasta completar el recovery.
+
+### Paso 1 — Leer contexto base
 1. Leer `WORKING_STATE.md` completo
 2. Leer `.product/memory/MEMORY.md` completo
-3. Si existe `.product/memory/[fecha-de-hoy].md`, leerlo tambien
+3. Leer `.product/memory/SESSION-STATE.md` si existe (WAL activo)
 4. Leer `AGENT_CONTEXT.md` para tener el mapa de progressive disclosure
+
+### Paso 2 — Verificar working-buffer
+Si `.product/memory/working-buffer.md` existe y tiene contenido de sesión anterior:
+- Leerlo y extraer contexto relevante
+- Limpiarlo para la nueva sesión (reemplazar con encabezado vacío)
+
+### Paso 3 — Log diario
+Si existe `.product/memory/[fecha-de-hoy].md`, leerlo para contexto de hoy.
 
 ## Que reportar
 

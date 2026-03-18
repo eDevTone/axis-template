@@ -32,6 +32,18 @@ Si hay tasks con Jira keys (patron PROJ-XXX) en "Completado en Ultima Sesion" o 
 - Mencionar: "Hay X tasks con Jira keys que cambiaron de status. Considera ejecutar `/sync-jira` para actualizar Jira."
 - NO ejecutar automaticamente — solo sugerir.
 
+### Paso 3.7 — Log diario (skill daily-log)
+Añadir entrada al log de hoy en `.product/memory/[YYYY-MM-DD].md`:
+- Resumen de qué se hizo en esta sesión
+- Decisiones tomadas
+- Aprendizajes o errores relevantes
+- Archivos principales tocados
+
+Si MEMORY.md tiene más de ~2,500 tokens, sugerir: "Considera ejecutar `/distill-memory` para limpiar y destilar la memoria."
+
+### Paso 3.8 — Limpiar working-buffer
+Si `.product/memory/working-buffer.md` tiene contenido de esta sesión, añadir entrada final de cierre y dejar el archivo listo para la próxima sesión.
+
 ### Paso 4 — Reporte de cierre
 Presentar resumen al usuario:
 
@@ -40,9 +52,11 @@ Presentar resumen al usuario:
 
 **Actualizado:** WORKING_STATE.md
 **MEMORY.md:** [sin cambios / propuesta de cambio pendiente]
+**Log diario:** .product/memory/[YYYY-MM-DD].md actualizado
+**Working buffer:** limpiado para próxima sesión
 **ADRs:** [ninguno / ADR-XXX propuesto]
 **Jira sync:** [sin tasks Jira / X tasks pendientes de sync — /sync-jira]
-**Log diario:** [no aplica / entrada anadida]
+**Distilación:** [no necesaria / MEMORY.md cerca del límite — ejecutar /distill-memory]
 
 Estado guardado. La proxima sesion puede retomar desde WORKING_STATE.md.
 ```
