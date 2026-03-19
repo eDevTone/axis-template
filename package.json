@@ -1,0 +1,12 @@
+{
+  "name": "axis-template",
+  "version": "1.0.0",
+  "description": "AXIS — Agent eXperience & Information Structure template",
+  "scripts": {
+    "init": "bash scripts/init-project.sh",
+    "update": "bash scripts/update-axis.sh",
+    "validate": "bash scripts/validate-axis-tokens.sh"
+  },
+  "keywords": ["axis", "claude", "agent", "context", "ai"],
+  "license": "MIT"
+}
